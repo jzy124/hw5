@@ -1,0 +1,151 @@
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import cmath
+
+
+def butterworth(F, n0, D0):
+    p_f = 0
+    p_g = 0
+    D = np.zeros((p, q), complex)
+    H = np.zeros((p, q), complex)
+    G = np.zeros((p, q), complex)
+    for u in range(p):
+        for v in range(q):
+            D[u][v] = cmath.sqrt((u - p / 2) ** 2 + (v - q / 2) ** 2)
+            # H[u][v] = 1 / (1 + (D[u][v] / D0) ** (2 * n0))  # lowpass
+            H[u][v] = 1 / (1 + (D0 / D[u][v]) ** (2 * n0))  # highpass
+            G[u][v] = H[u][v] * F[u][v]
+            p_f += abs(F[u][v]) ** 2
+            p_g += abs(G[u][v]) ** 2
+    P = p_g / p_f
+    return G, P
+
+
+def gaussian(F, D0):
+    p_f = 0
+    p_g = 0
+    D = np.zeros((p, q), complex)
+    H = np.zeros((p, q), complex)
+    G = np.zeros((p, q), complex)
+    for u in range(p):
+        for v in range(q):
+            D[u][v] = cmath.sqrt((u - p / 2) ** 2 + (v - q / 2) ** 2)
+            # H[u][v] = math.exp(-(D[u][v] ** 2) / (2 * D0 ** 2))  # lowpass
+            H[u][v] = 1 - cmath.exp(- (D[u][v] ** 2) / (2 * D0 ** 2))  # highpass
+            G[u][v] = H[u][v] * F[u][v]
+            p_f += abs(F[u][v]) ** 2
+            p_g += abs(G[u][v]) ** 2
+    P = p_g / p_f
+    return G, P, H
+
+
+def laplace(F):
+    p_f = 0
+    p_g = 0
+    D = np.zeros((p, q), complex)
+    H = np.zeros((p, q), complex)
+    G = np.zeros((p, q), complex)
+    for u in range(p):
+        for v in range(q):
+            D[u][v] = cmath.sqrt((u - p / 2) ** 2 + (v - q / 2) ** 2)
+            H[u][v] = 1 + 4 * (cmath.pi ** 2) * (D[u][v] ** 2)
+            G[u][v] = H[u][v] * F[u][v]
+            p_f += abs(F[u][v]) ** 2
+            p_g += abs(G[u][v]) ** 2
+    P = p_g / p_f
+    return G, P
+
+
+def unmask(F, H, k):
+    G = np.zeros((p, q), complex)
+    for u in range(p):
+        for v in range(q):
+            G[u][v] = (1 + k * H[u][v]) * F[u][v]
+    return G
+
+
+# img = cv2.imread('test3_corrupt.pgm', 0)
+img = cv2.imread('test3_corrupt.pgm', 0)
+n0 = 2
+D1 = 25
+D2 = 50
+D3 = 75
+
+m, n = img.shape
+f = cv2.copyMakeBorder(img, 0, m, 0, n, cv2.BORDER_CONSTANT, value=0)
+p, q = f.shape
+
+F = np.fft.fft2(f)
+F = np.fft.fftshift(F)
+
+# G1, P1 = butterworth(F, n0, D1)
+# G2, P2 = butterworth(F, n0, D2)
+# G3, P3 = butterworth(F, n0, D3)
+
+G, P1, H = gaussian(F, D3)
+# G2, P2, H1 = gaussian(F, D2)
+# G3, P3, H2 = gaussian(F, D3)
+
+# G1, P1 = laplace(F)
+
+G1 = unmask(F, H, 1)
+
+G1 = np.fft.ifftshift(G1)
+g1 = np.fft.ifft2(G1)
+
+# G1 = np.fft.ifftshift(G1)
+# g1 = np.fft.ifft2(G1)
+# G2 = np.fft.ifftshift(G2)
+# g2 = np.fft.ifft2(G2)
+# G3 = np.fft.ifftshift(G3)
+# g3 = np.fft.ifft2(G3)
+
+img1 = np.zeros((m, n))
+# img2 = np.zeros((m, n))
+# img3 = np.zeros((m, n))
+for x in range(m):
+    for y in range(n):
+        img1[x][y] = abs(g1[x][y])
+        # img2[x][y] = abs(g2[x][y])
+        # img3[x][y] = abs(g3[x][y])
+
+# plt.figure("test4-gaussian")
+# plt.figure("test3-butterworth")
+
+plt.figure("test3-unmask")
+
+# plt.subplot(221)
+# plt.title("Original")
+# plt.imshow(img, cmap="gray")
+# plt.axis('off')
+#
+# plt.subplot(222)
+# plt.title("D0=25")
+# # plt.title("laplace")
+# plt.imshow(img1, cmap="gray")
+# plt.axis('off')
+#
+# plt.subplot(223)
+# plt.title("D0=50")
+# plt.imshow(img2, cmap="gray")
+# plt.axis('off')
+#
+# plt.subplot(224)
+# plt.title("D0=75")
+# plt.imshow(img3, cmap="gray")
+# plt.axis('off')
+# print(P1, P2, P3)
+
+plt.subplot(121)
+plt.title("Original")
+plt.imshow(img, cmap="gray")
+plt.axis('off')
+
+plt.subplot(122)
+# plt.title("laplace")
+plt.title("unmask")
+plt.imshow(img1, cmap="gray")
+plt.axis('off')
+
+plt.show()
